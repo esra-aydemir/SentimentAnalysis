@@ -22,7 +22,7 @@ def fill_stopword(stopwords_path):
     return stoplist
 #%%
  
-def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer):
+def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem):
     
     with open(file_path, "r",encoding='utf-8') as fp:
         sentences=fp.readline()
@@ -38,48 +38,60 @@ def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer):
             data_id.append(tokenized_sents[0][0])
             temp=[]
             for each_sentence in tokenized_sents:
-                temp+=[''.join(c for c in s if c not in string.punctuation and not c.isnumeric() ) for s in each_sentence if s not in stoplist]
-                temp = [convert_turkish_char(stemmer.stem(s)) for s in temp if len(s) >1]
+                #temp+=[''.join(c for c in s if c not in string.punctuation and not c.isnumeric() ) for s in each_sentence if s not in stoplist]
+                temp+=[''.join(c for c in s if c not in string.punctuation and  c.isalpha() ) for s in each_sentence if s not in stoplist]             
+                temp = [convert_turkish_char(stemmer.stem(s)) for s in temp ]
+                temp = [s for s in temp if len(s)>1 and s not in stoplist]
             
+            for i in temp:
+                if i not in positional_stem[label]:
+                   positional_stem[label][i]=1
+                else:
+                   positional_stem[label][i]+=1 
+                    
+                    
             tokens.append(temp)
             data_labels.append(label)
             sentences=fp.readline()
     fp.close()    
-    return tokens,data_id,data_labels
+    return tokens,data_id,data_labels,positional_stem
 
 
 #%%
 
 def read_all_file(data_path,stoplist,stemmer):
-    data_labels=[]
-    data_id=[]
-    tokens=[]
+    data_labels = []
+    data_id = []
+    tokens = []
+    positional_stem = defaultdict()
+    positional_stem[0] = {}
+    positional_stem[1] = {}
+    positional_stem[-1] = {}
+    
     for filename in os.listdir(data_path):
-        label=0
+        label = 0
         if 'negative' in filename:
-            label=-1
+            label = -1
         elif 'positive' in filename:
-            label=1
-        tokens,data_id,data_labels=read_file(data_path+filename,tokens,data_id,data_labels,label,stoplist,stemmer)
+            label = 1
+        tokens,data_id,data_labels,positonal_stem = read_file(data_path+filename,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem)
         
-    return tokens,data_id,data_labels    
+    return tokens,data_id,data_labels,positional_stem    
 
 #%%        
 def convert_turkish_char(sentence):
-    sentence = re.sub(r'ğ','g',sentence)            
-    sentence = re.sub(r'ç','c',sentence)            
-    sentence = re.sub(r'ş','s',sentence)            
-    sentence = re.sub(r'ü','u',sentence)            
-    sentence = re.sub(r'ö','o',sentence)            
+    sentence = re.sub(r'ğ','g',sentence , flags=re.IGNORECASE)            
+    sentence = re.sub(r'ç','c',sentence , flags=re.IGNORECASE)            
+    sentence = re.sub(r'ş','s',sentence , flags=re.IGNORECASE)            
+    sentence = re.sub(r'ü','u',sentence , flags=re.IGNORECASE)            
+    sentence = re.sub(r'ö','o',sentence , flags=re.IGNORECASE)            
     return sentence        
          
-#%%
-    
-    
     
 #%%
 stemmer = TurkishStemmer()
 stoplist=fill_stopword(stopwords_path)     
-tokens,data_id,data_labels=read_all_file(data_path,stoplist,stemmer)     
-        
+tokens,data_id,data_labels,positional_stem=read_all_file(data_path,stoplist,stemmer)     
+
+#%%
         
