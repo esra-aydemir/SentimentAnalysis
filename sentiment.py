@@ -17,6 +17,9 @@ from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import LinearSVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors.nearest_centroid import NearestCentroid
+
 
 
 #%%
@@ -188,7 +191,10 @@ def train_model(model, all_sentences,data_labels):
          
     
 #%%
+#model = KNeighborsClassifier(n_neighbors=5)
 #model = MultinomialNB()    
-model = LogisticRegression(random_state=0)
+#model = LogisticRegression(random_state=0)
 #model = LinearSVC()
+model = NearestCentroid()
+model.metric='euclidean'
 train_model(model, all_sentences,data_labels)    
