@@ -6,12 +6,24 @@ import os
 from TurkishStemmer import TurkishStemmer
 from collections import defaultdict
 from math import log
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+from sklearn import metrics
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import LinearSVC
+
 
 #%%
 #'negative'=-1
 #'positive'=1
 #'notr'=0
-data_path="train/"
+data_path="../train/"
 stopwords_path="stopwords.txt"
 #%%
 def fill_stopword(stopwords_path):    
@@ -46,7 +58,7 @@ def trlower(str):
     return res
 #%%
  
-def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem):
+def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem, all_sentences):
     
     with open(file_path, "r",encoding='utf-8') as fp:
         sentences=fp.readline()
@@ -67,7 +79,9 @@ def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer,positi
                 temp = [convert_turkish_char(stemmer.stem(s)) for s in temp ]
                 temp = [s for s in temp if len(s)>1 and s not in stoplist]
             
+            one_sentence = ' '
             for i in temp:
+                one_sentence += ' '+i
                 if i not in positional_stem[label]:
                    positional_stem[label][i]=1
                 else:
@@ -76,9 +90,11 @@ def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer,positi
                     
             tokens.append(temp)
             data_labels.append(label)
+            all_sentences.append(one_sentence)
             sentences=fp.readline()
+            
     fp.close()    
-    return tokens,data_id,data_labels,positional_stem
+    return tokens,data_id,data_labels,positional_stem,all_sentences
 
 
 #%%
@@ -87,6 +103,7 @@ def read_all_file(data_path,stoplist,stemmer):
     data_labels = []
     data_id = []
     tokens = []
+    all_sentences = []
     positional_stem = defaultdict()
     positional_stem[0] = {}
     positional_stem[1] = {}
@@ -98,9 +115,9 @@ def read_all_file(data_path,stoplist,stemmer):
             label = -1
         elif 'positive' in filename:
             label = 1
-        tokens,data_id,data_labels,positonal_stem = read_file(data_path+filename,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem)
+        tokens,data_id,data_labels,positonal_stem, all_sentences = read_file(data_path+filename,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem,all_sentences)
         
-    return tokens,data_id,data_labels,positional_stem    
+    return tokens,data_id,data_labels,positional_stem, all_sentences    
 
 #%%        
 def convert_turkish_char(sentence):
@@ -115,7 +132,7 @@ def convert_turkish_char(sentence):
 #%%
 stemmer = TurkishStemmer()
 stoplist=fill_stopword(stopwords_path)     
-tokens,data_id,data_labels,positional_stem=read_all_file(data_path,stoplist,stemmer)     
+tokens,data_id,data_labels,positional_stem,all_sentences=read_all_file(data_path,stoplist,stemmer)     
 
 #%%
 wordCountsByClass = [dict(),dict(),dict()]#neg,notr,pos  /-1 0 1
@@ -150,4 +167,28 @@ def m_a_p(snt):
     return mapcls-1#returns sentiment of max a posteriori class
  
 #%%
-      
+# it is not necessary now , but it will be useful for future work    
+def get_tfidf(all_sentences):
+    tfidf = TfidfVectorizer(sublinear_tf=True, min_df=5, norm='l2', encoding='latin-1', ngram_range=(1, 2), stop_words='english')
+
+    features = tfidf.fit_transform(all_sentences)
+    print(features.shape)
+    return features
+    
+#%%
+def train_model(model, all_sentences,data_labels):
+    X_train, X_test, y_train, y_test = train_test_split(all_sentences, data_labels, random_state = 0)
+    count_vect = CountVectorizer()
+    X_train_counts = count_vect.fit_transform(X_train)
+    tfidf_transformer = TfidfTransformer()
+    X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
+    clf = model.fit(X_train_tfidf, y_train)   
+    y_pred = clf.predict(count_vect.transform(X_test))
+    print(metrics.classification_report(y_test, y_pred))
+         
+    
+#%%
+#model = MultinomialNB()    
+model = LogisticRegression(random_state=0)
+#model = LinearSVC()
+train_model(model, all_sentences,data_labels)    
