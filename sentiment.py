@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 from sklearn import metrics
@@ -28,6 +29,7 @@ from numpy import linalg as LA
 import glob
 import random
 from sklearn import preprocessing
+import pickle
 
 data_path="../train/"
 stopwords_path="stopwords.txt"
@@ -243,25 +245,7 @@ def read3000tweet():
     negatives = readData(pathToDataset+"/-1",-1,all_sentences)  
     neutrals = readData(pathToDataset+"/0",0,all_sentences)
     return all_sentences,data_labels,tokens
-    
-#%%tf-idf model
-# it is not necessary now , but it will be useful for future work    
-def get_tfidf(all_sentences):
-    tfidf = TfidfVectorizer(sublinear_tf=True, min_df=5, norm='l2', encoding='latin-1', ngram_range=(1, 2), stop_words='english')
 
-    features = tfidf.fit_transform(all_sentences)
-    print(features.shape)
-    return features
-
-def train_tfidf_model(model, all_sentences,data_labels):
-    count_vect = CountVectorizer()
-    X_counts = count_vect.fit_transform(all_sentences)
-    tfidf_transformer = TfidfTransformer()
-    X_tfidf = tfidf_transformer.fit_transform(X_counts)
-    cross_validation_results(model,X_tfidf,data_labels)
-         
-
-    
 #%%Word2Vec model
 # generate word to vector in dictionary    
 def get_dictionary_word2vec(distinct_word, word_vectors):
@@ -299,41 +283,43 @@ def get_tweet_vector_average(num_sentence,dic_word2vec,positional_word):
     sentenceVec = [sentence_vec[i]/sentence_count[i]   for i in range(len(sentence_vec))]    
     
     return sentenceVec
-
-def train_word2vec_model(model, all_sentences,data_labels):
-    cross_validation_results(model,all_sentences,data_labels)
-
     
 #%%
-# arrange later , but now it is template    
-#def main():
-#    stemmer = TurkishStemmer()
-#    stoplist=fill_stopword(stopwords_path)     
-#    tokens,data_id,data_labels,positional_stem,all_sentences, distinct_word , positional_word = read_all_file(data_path,stoplist,stemmer,word_vectors)     
-    #dic_word2vec= get_dictionary_word2vec(distinct_word, word_vectors)
-#    num_sentences = len(all_sentences)
-#    sentence_vec = get_tweet_vector_addition(num_sentences,dic_word2vec,positional_word)
+## get the  cross validation scores      
+def train_tfidf_model(model, all_sentences,data_labels):
+    count_vect = CountVectorizer()
+    X_counts = count_vect.fit_transform(all_sentences)
+    tfidf_transformer = TfidfTransformer()
+    X_tfidf = tfidf_transformer.fit_transform(X_counts)
+    cross_validation_results(model,X_tfidf,data_labels)
+#%%
+# get the tfidf model after training    
+def get_tfidf_model(model, all_sentences,data_labels):
+    count_vect = CountVectorizer()
+    X_counts = count_vect.fit_transform(all_sentences)
+    tfidf_transformer = TfidfTransformer()
+    X_tfidf = tfidf_transformer.fit_transform(X_counts)
+    clf = model.fit(X_tfidf, data_labels)  
+    return clf,count_vect
 
-    #model = KNeighborsClassifier(n_neighbors=5)
-    #model = MultinomialNB()    
-#    model = LogisticRegression(random_state=0)
-    #model = LinearSVC()
-    #model = NearestCentroid()
-    #model.metric='euclidean'
-    #train_tfidf_model(model, all_sentences,data_labels)    
-#    train_word2vec_model(model, sentence_vec,data_labels)  
     
-#%% main2:
-#'negative'=-1
-#'positive'=1
-#'notr'=0
-#%%preprocess:
+         
+#%%
+# get the prediction of the trained model    
+def train_tfidf_model_prediction(model, count_vect,test_sentences):
+    y_pred = model.predict(count_vect.transform(test_sentences))
+    with open("output.txt", "w") as f:
+        for x in y_pred:
+            f.write(str(x) + "\n")
+    f.close() 
+         
+    
 
-#stemmer = TurkishStemmer()
-#stoplist=fill_stopword(stopwords_path)     
-#tokens,data_id,data_labels,positional_stem,all_sentences, distinct_word , positional_word = read_all_file(data_path,stoplist,stemmer,word_vectors)     
-
-#all_sent2,data_label2,tokens2 = read3000tweet()
+#%%
+# get the cross validation scores    
+def train_word2vec_model(model, all_sentences,data_labels):
+    cross_validation_results(model,all_sentences,data_labels)
+    
 
 #%%
 
@@ -347,24 +333,13 @@ def train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test):
     print(metrics.classification_report(y_test, y_pred))
 
 
-         
-#%% tf-idf:
-#model = MultinomialNB()
-#train_tfidf_model(model,all_sentences,data_labels)
-#train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test)
-
-
-
 #%%cross validation:
 def cross_validation_results(clf,x,y):
     lb = preprocessing.LabelBinarizer()
     lb.fit(y)
-    scoring = ['precision_macro', 'recall_macro','f1_macro']
-    scores = cross_validate(clf, x, y, scoring=scoring, cv=5, return_train_score=False)
-    print("Precision: %0.2f " % (scores['test_precision_macro'].mean()))
-    print("Recall: %0.2f " % (scores['test_recall_macro'].mean()))
-    print("f1_macro: %0.2f " % (scores['test_f1_macro'].mean()))
-
+    scores = cross_val_score(clf, x, y, cv=5)
+    print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+    
 
 
 #%%
@@ -403,6 +378,9 @@ def main():
             train_tfidf_model(model,all_sentences,data_labels) 
                 
         elif trainModel == '2':
+            if classifier == '2':
+                model = GaussianNB()
+            
             word_vectors = KeyedVectors.load_word2vec_format('trmodel', binary=True)
             tokens,data_id,data_labels,positional_stem,all_sentences, distinct_word , positional_word  = read_all_file(data_path,stoplist,stemmer,word_vectors,remove_vowels=False)
             num_sentences = len(all_sentences)
@@ -410,6 +388,7 @@ def main():
             sentence_vec_addition = get_tweet_vector_addition(num_sentences,dic_word2vec,positional_word)
             sentence_vec_average = get_tweet_vector_average(num_sentences,dic_word2vec,positional_word)
             sentence_vec = sentence_vec_addition #= sentence_vec_average
+            #sentence_vec = sentence_vec_average #= sentence_vec_average
             
             train_word2vec_model(model,sentence_vec,data_labels)
         else:
@@ -428,7 +407,7 @@ def main():
             y_train+=list(b)
             train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test)
         elif trainModel == '2':#word to vec
-            pass #bunu da yapiyor muyuz? beynim yandi asadf
+            pass 
             
         else:
             print('invalid model input, using default: tfidf')
@@ -443,5 +422,101 @@ def main():
             train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test)
 
 #%%
-main()
+# preprocessing for the test file
+            
+def read_test_file(file_path,stoplist, stemmer, remove_vowels=False):
+    test_sentences = []
+    with open(file_path, "r",encoding='utf-8') as fp:
+        sentences=fp.readline()
+        while sentences:  
+            sentences = re.sub('#',' ', sentences)
+            re.sub(r"([a-z])([A-Z])", r"\1 \2", sentences)
+            sentences = re.sub('@\S*', ' ', sentences)
+            sentences = re.sub('pic\\..*(\s)+', ' ', sentences)
+            sentences = re.sub(r"’(\S)*(\s)",' ',sentences)
+            sentences = re.sub(r"'(\S)*(\s)",' ',sentences)    
+            
+            
+            tokenized_sents = [word_tokenize(trlower(sent))  for sent in sent_tokenize(sentences) ]        
+            temp=[]
+            
+            for each_sentence in tokenized_sents:
+                #temp+=[''.join(c for c in s if c not in string.punctuation and not c.isnumeric() ) for s in each_sentence if s not in stoplist]
+                temp+=[''.join(c for c in s if c not in string.punctuation and  c.isalpha() ) for s in each_sentence if s not in stoplist]             
+                temp = [convert_turkish_char(stemmer.stem(s)) for s in temp ]
+                temp = [s for s in temp if len(s)>1 and s not in stoplist]
+                if remove_vowels:
+                    temp = [remove_vowels_(s) for s in temp]            
+            
+            one_sentence = ' '
+            for i in temp:
+                one_sentence += ' '+i
+                    
+            test_sentences.append(one_sentence)
+
+            sentences=fp.readline()
+            
+    fp.close()  
+    return test_sentences      
+           
     
+#%%
+# prediction from the model which has best accuracy from cross validation    
+def get_prediction_from_best_model(test_path):
+    global stopwords_path
+    global data_path
+    stemmer = TurkishStemmer()    
+    stoplist=fill_stopword(stopwords_path)
+    
+    model = LinearSVC()            
+    tokens,data_id,data_labels,all_sentences = read_all_file(data_path,stoplist,stemmer,remove_vowels=False)
+    model,count_vect = get_tfidf_model(model, all_sentences,data_labels) 
+    test_sentences = read_test_file(test_path,stoplist,stemmer)                    
+    train_tfidf_model_prediction(model,count_vect, test_sentences)        
+
+
+#%%
+def get_prediction_from_dumping_model(model_list,test_path):
+    global stopwords_path
+    global data_path
+    stemmer = TurkishStemmer()    
+    stoplist=fill_stopword(stopwords_path)
+    
+    test_sentences = read_test_file(test_path,stoplist,stemmer)                    
+    train_tfidf_model_prediction(model_list[0],model_list[1], test_sentences)        
+     
+#%%
+def dumping(file_name,sents):
+        output = open(file_name, 'wb')
+        pickle.dump(sents, output)
+        output.close();   
+    
+#%%
+def read_dumping_file(file_name):
+        pkl_file = open(file_name, 'rb')
+        data = pickle.load(pkl_file)
+        pkl_file.close();
+        return data      
+
+#%%
+def dump_best_model():
+    global stopwords_path
+    global data_path
+    stemmer = TurkishStemmer()    
+    stoplist=fill_stopword(stopwords_path)
+    stemmer = TurkishStemmer()    
+    stoplist=fill_stopword(stopwords_path)     
+    
+    model = LinearSVC()            
+    tokens,data_id,data_labels,all_sentences = read_all_file(data_path,stoplist,stemmer,remove_vowels=False)
+    model,count_vect = get_tfidf_model(model, all_sentences,data_labels)
+    model_list = [model,count_vect]
+    dumping('model.plk',model_list)    
+    
+#%%    
+test_path = input("write the test file path!")        
+#main()
+#get_prediction_from_best_model(test_path)    
+#dump_best_model()        
+model_list = read_dumping_file('model.plk')
+get_prediction_from_dumping_model(model_list,test_path)    
