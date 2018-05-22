@@ -1,4 +1,4 @@
-#%%
+
 from nltk import sent_tokenize, word_tokenize
 import string
 import re
@@ -23,9 +23,11 @@ from sklearn.feature_selection import SelectKBest
 from sklearn.feature_selection import chi2
 from gensim.models import KeyedVectors
 import numpy as np
+from sklearn.model_selection import cross_val_score,cross_validate
 from numpy import linalg as LA
 import glob
 import random
+from sklearn import preprocessing
 
 data_path="../train/"
 stopwords_path="stopwords.txt"
@@ -252,14 +254,11 @@ def get_tfidf(all_sentences):
     return features
 
 def train_tfidf_model(model, all_sentences,data_labels):
-    X_train, X_test, y_train, y_test = train_test_split(all_sentences, data_labels,  test_size=0.30 , random_state = 0)
     count_vect = CountVectorizer()
-    X_train_counts = count_vect.fit_transform(X_train)
+    X_counts = count_vect.fit_transform(all_sentences)
     tfidf_transformer = TfidfTransformer()
-    X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
-    clf = model.fit(X_train_tfidf, y_train)   
-    y_pred = clf.predict(count_vect.transform(X_test))
-    print(metrics.classification_report(y_test, y_pred))
+    X_tfidf = tfidf_transformer.fit_transform(X_counts)
+    cross_validation_results(model,X_tfidf,data_labels)
          
 
     
@@ -302,10 +301,7 @@ def get_tweet_vector_average(num_sentence,dic_word2vec,positional_word):
     return sentenceVec
 
 def train_word2vec_model(model, all_sentences,data_labels):
-    X_train, X_test, y_train, y_test = train_test_split(all_sentences, data_labels,  test_size=0.3 ,random_state = 0)
-    clf = model.fit(X_train, y_train)   
-    y_pred = clf.predict(X_test)
-    print(metrics.classification_report(y_test, y_pred))
+    cross_validation_results(model,all_sentences,data_labels)
 
     
 #%%
@@ -361,9 +357,16 @@ def train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test):
 
 #%%cross validation:
 def cross_validation_results(clf,x,y):
-    #clf = svm.SVC(kernel='linear', C=1)-> sth like this
-    scores = cross_val_score(clf, x,y, cv=5)
-    print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+    lb = preprocessing.LabelBinarizer()
+    lb.fit(y)
+    scoring = ['precision_macro', 'recall_macro','f1_macro']
+    scores = cross_validate(clf, x, y, scoring=scoring, cv=5, return_train_score=False)
+    print("Precision: %0.2f " % (scores['test_precision_macro'].mean()))
+    print("Recall: %0.2f " % (scores['test_recall_macro'].mean()))
+    print("f1_macro: %0.2f " % (scores['test_f1_macro'].mean()))
+
+
+
 #%%
 def main():
     global stopwords_path
@@ -383,7 +386,7 @@ def main():
         model = MultinomialNB()
     elif classifier == '3':
         model = NearestCentroid()
-        
+        model.metric='euclidean'
     elif classifier == '4':
         model = KNeighborsClassifier(n_neighbors = 5)
     elif classifier == '5':
@@ -392,7 +395,7 @@ def main():
         print('invalid classifier input, using default: Logistic Regression')
         model = LogisticRegression(random_state = 0)
         
-    #model.metric='euclidean'
+    
     
     if trainData=='1':
         if trainModel == '1':
@@ -401,14 +404,14 @@ def main():
                 
         elif trainModel == '2':
             word_vectors = KeyedVectors.load_word2vec_format('trmodel', binary=True)
-
             tokens,data_id,data_labels,positional_stem,all_sentences, distinct_word , positional_word  = read_all_file(data_path,stoplist,stemmer,word_vectors,remove_vowels=False)
             num_sentences = len(all_sentences)
             dic_word2vec= get_dictionary_word2vec(distinct_word, word_vectors)
             sentence_vec_addition = get_tweet_vector_addition(num_sentences,dic_word2vec,positional_word)
             sentence_vec_average = get_tweet_vector_average(num_sentences,dic_word2vec,positional_word)
             sentence_vec = sentence_vec_addition #= sentence_vec_average
-            train_word2vec_model(model,all_sentences,data_labels)
+            
+            train_word2vec_model(model,sentence_vec,data_labels)
         else:
             print('invalid model input, using default: tfidf')
             read_all_file(data_path,stoplist,stemmer,remove_vowels=False)
