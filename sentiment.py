@@ -78,7 +78,7 @@ def remove_vowels_(string):
         if c in ['q','w','r','t','y','p','ğ','s','d','f','g','h','j','k','l','ş','z','x','c','v','b','n','m','ç']:
             res+=c
     return res
-def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem, all_sentences,distinct_word  ,positional_word , word_vectors,remove_vowels=False):
+def read_file_vW(file_path,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem, all_sentences,distinct_word  ,positional_word , word_vectors,remove_vowels=False):
     
     with open(file_path, "r",encoding='utf-8') as fp:
         sentences=fp.readline()
@@ -130,7 +130,45 @@ def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer,positi
     fp.close()    
     return tokens,data_id,data_labels,positional_stem,all_sentences,distinct_word,  positional_word
 
-def read_all_file(data_path,stoplist,stemmer,word_vectors,remove_vowels=False):
+def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer, all_sentences,remove_vowels=False):
+    
+    with open(file_path, "r",encoding='utf-8') as fp:
+        sentences=fp.readline()
+    
+        while sentences:  
+            sentences = re.sub('#',' ', sentences)
+            re.sub(r"([a-z])([A-Z])", r"\1 \2", sentences)
+            sentences = re.sub('@\S*', ' ', sentences)
+            sentences = re.sub('pic\\..*(\s)+', ' ', sentences)
+            sentences = re.sub(r"’(\S)*(\s)",' ',sentences)
+            sentences = re.sub(r"'(\S)*(\s)",' ',sentences)    
+            
+            #print(sentences)
+            tokenized_sents = [word_tokenize(trlower(sent))  for sent in sent_tokenize(sentences) ]        
+            data_id.append(tokenized_sents[0][0])
+            temp=[]
+            
+            for each_sentence in tokenized_sents:
+                #temp+=[''.join(c for c in s if c not in string.punctuation and not c.isnumeric() ) for s in each_sentence if s not in stoplist]
+                temp+=[''.join(c for c in s if c not in string.punctuation and  c.isalpha() ) for s in each_sentence if s not in stoplist]             
+                temp = [convert_turkish_char(stemmer.stem(s)) for s in temp ]
+                temp = [s for s in temp if len(s)>1 and s not in stoplist]
+                if remove_vowels:
+                    temp = [remove_vowels_(s) for s in temp]            
+            one_sentence = ' '
+            for i in temp:
+                one_sentence += ' '+i
+                    
+            tokens.append(temp)
+            data_labels.append(label)
+            all_sentences.append(one_sentence)
+
+            sentences=fp.readline()
+            
+    fp.close()    
+    return tokens,data_id,data_labels,all_sentences
+
+def read_all_file(data_path,stoplist,stemmer,word_vectors=[],remove_vowels=False):
     data_labels = []
     data_id = []
     tokens = []
@@ -148,13 +186,18 @@ def read_all_file(data_path,stoplist,stemmer,word_vectors,remove_vowels=False):
             label = -1
         elif 'positive' in filename:
             label = 1
-        tokens,data_id,data_labels,positonal_stem, all_sentences,distinct_word ,positional_word = read_file(data_path+filename,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem,all_sentences,distinct_word, positional_word, word_vectors,remove_vowels)
+        if (word_vectors):
+            tokens,data_id,data_labels,positonal_stem, all_sentences,distinct_word ,positional_word = read_file_vW(data_path+filename,tokens,data_id,data_labels,label,stoplist,stemmer,positional_stem,all_sentences,distinct_word, positional_word, word_vectors,remove_vowels)
+        else:
+            tokens,data_id,data_labels,all_sentences = read_file(data_path+filename,tokens,data_id,data_labels,label,stoplist,stemmer,all_sentences,remove_vowels)
+    if (word_vectors):
+        return tokens,data_id,data_labels,positional_stem, all_sentences,distinct_word,positional_word    
+    else:
+        return tokens,data_id,data_labels,all_sentences
         
-    return tokens,data_id,data_labels,positional_stem, all_sentences,distinct_word,positional_word    
-
 #%% read file of tweet3000 dataset:
 def read3000tweet():
-
+    stemmer = TurkishStemmer()
     def readData(folderPath,label,all_sentences):
         dirlist = glob.glob(folderPath+"/*.txt")
         stoplist=fill_stopword(stopwords_path) 
@@ -169,7 +212,6 @@ def read3000tweet():
                     
                     #print(sentences)
                     tokenized_sents = [word_tokenize(trlower(sent))  for sent in sent_tokenize(sentences) ]        
-                    data_id.append(tokenized_sents[0][0])
                     temp=[]
                     
                     for each_sentence in tokenized_sents:
@@ -268,22 +310,22 @@ def train_word2vec_model(model, all_sentences,data_labels):
     
 #%%
 # arrange later , but now it is template    
-def main():
-    stemmer = TurkishStemmer()
-    stoplist=fill_stopword(stopwords_path)     
-    tokens,data_id,data_labels,positional_stem,all_sentences, distinct_word , positional_word = read_all_file(data_path,stoplist,stemmer,word_vectors)     
+#def main():
+#    stemmer = TurkishStemmer()
+#    stoplist=fill_stopword(stopwords_path)     
+#    tokens,data_id,data_labels,positional_stem,all_sentences, distinct_word , positional_word = read_all_file(data_path,stoplist,stemmer,word_vectors)     
     #dic_word2vec= get_dictionary_word2vec(distinct_word, word_vectors)
-    num_sentences = len(all_sentences)
-    sentence_vec = get_tweet_vector_addition(num_sentences,dic_word2vec,positional_word)
+#    num_sentences = len(all_sentences)
+#    sentence_vec = get_tweet_vector_addition(num_sentences,dic_word2vec,positional_word)
 
     #model = KNeighborsClassifier(n_neighbors=5)
     #model = MultinomialNB()    
-    model = LogisticRegression(random_state=0)
+#    model = LogisticRegression(random_state=0)
     #model = LinearSVC()
     #model = NearestCentroid()
     #model.metric='euclidean'
     #train_tfidf_model(model, all_sentences,data_labels)    
-    train_word2vec_model(model, sentence_vec,data_labels)  
+#    train_word2vec_model(model, sentence_vec,data_labels)  
     
 #%% main2:
 #'negative'=-1
@@ -291,20 +333,13 @@ def main():
 #'notr'=0
 #%%preprocess:
 
-stemmer = TurkishStemmer()
-stoplist=fill_stopword(stopwords_path)     
-tokens,data_id,data_labels,positional_stem,all_sentences, distinct_word , positional_word = read_all_file(data_path,stoplist,stemmer,word_vectors)     
+#stemmer = TurkishStemmer()
+#stoplist=fill_stopword(stopwords_path)     
+#tokens,data_id,data_labels,positional_stem,all_sentences, distinct_word , positional_word = read_all_file(data_path,stoplist,stemmer,word_vectors)     
 
-all_sent2,data_label2,tokens2 = read3000tweet()
+#all_sent2,data_label2,tokens2 = read3000tweet()
 
 #%%
-X_train, X_test, y_train, y_test = train_test_split(all_sentences, data_labels,  test_size=0.30 , random_state = 0)
-
-c = list(zip(all_sent2,data_label2))
-random.shuffle(c)
-a, b = zip(*c)
-X_train+=list(a)
-y_train+=list(b)
 
 def train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test):
     count_vect = CountVectorizer()
@@ -318,21 +353,92 @@ def train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test):
 
          
 #%% tf-idf:
-model = MultinomialNB()
-train_tfidf_model(model,all_sentences,data_labels)
-train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test)
-
-#%% word2vec:
-word_vectors = KeyedVectors.load_word2vec_format('trmodel', binary=True)
+#model = MultinomialNB()
+#train_tfidf_model(model,all_sentences,data_labels)
+#train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test)
 
 
-num_sentences = len(all_sentences)
-dic_word2vec= get_dictionary_word2vec(distinct_word, word_vectors)
 
-sentence_vec_addition = get_tweet_vector_addition(num_sentences,dic_word2vec,positional_word)
+#%%cross validation:
+def cross_validation_results(clf,x,y):
+    #clf = svm.SVC(kernel='linear', C=1)-> sth like this
+    scores = cross_val_score(clf, x,y, cv=5)
+    print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+#%%
+def main():
+    global stopwords_path
+    global data_path
+    stemmer = TurkishStemmer()    
+    stoplist=fill_stopword(stopwords_path)     
 
-sentence_vec_average = get_tweet_vector_average(num_sentences,dic_word2vec,positional_word)
+    trainData = input("input train data (1:localtraindata, 2: local+3000tweet dataset) : \n")
+    trainModel = input("input model number (1:tfidf, 2:word2vec) : \n")
+    classifier= input("input classifier (1:lr, 2:multinomialNB, 3:nearestCentroid, 4:knn, 5:linearSVC) :\n")
+    data_path="../train/"
+    stopwords_path="stopwords.txt"
+        
+    if classifier == '1':
+        model = LogisticRegression(random_state = 0)
+    elif classifier == '2':
+        model = MultinomialNB()
+    elif classifier == '3':
+        model = NearestCentroid()
+        
+    elif classifier == '4':
+        model = KNeighborsClassifier(n_neighbors = 5)
+    elif classifier == '5':
+        model = LinearSVC()
+    else:
+        print('invalid classifier input, using default: Logistic Regression')
+        model = LogisticRegression(random_state = 0)
+        
+    #model.metric='euclidean'
+    
+    if trainData=='1':
+        if trainModel == '1':
+            tokens,data_id,data_labels,all_sentences = read_all_file(data_path,stoplist,stemmer,remove_vowels=False)
+            train_tfidf_model(model,all_sentences,data_labels) 
+                
+        elif trainModel == '2':
+            word_vectors = KeyedVectors.load_word2vec_format('trmodel', binary=True)
 
-sentence_vec = sentence_vec_addition #= sentence_vec_average
+            tokens,data_id,data_labels,positional_stem,all_sentences, distinct_word , positional_word  = read_all_file(data_path,stoplist,stemmer,word_vectors,remove_vowels=False)
+            num_sentences = len(all_sentences)
+            dic_word2vec= get_dictionary_word2vec(distinct_word, word_vectors)
+            sentence_vec_addition = get_tweet_vector_addition(num_sentences,dic_word2vec,positional_word)
+            sentence_vec_average = get_tweet_vector_average(num_sentences,dic_word2vec,positional_word)
+            sentence_vec = sentence_vec_addition #= sentence_vec_average
+            train_word2vec_model(model,all_sentences,data_labels)
+        else:
+            print('invalid model input, using default: tfidf')
+            read_all_file(data_path,stoplist,stemmer,remove_vowels=False)
+            
+    elif trainData =='2':
+        if trainModel=='1':
+            tokens,data_id,data_labels,all_sentences = read_all_file(data_path,stoplist,stemmer)                 
+            all_sent2,data_label2,tokens2 = read3000tweet()
+            X_train, X_test, y_train, y_test = train_test_split(all_sentences, data_labels,  test_size=0.30 , random_state = 0)                
+            c = list(zip(all_sent2,data_label2))
+            random.shuffle(c)
+            a, b = zip(*c)
+            X_train+=list(a)
+            y_train+=list(b)
+            train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test)
+        elif trainModel == '2':#word to vec
+            pass #bunu da yapiyor muyuz? beynim yandi asadf
+            
+        else:
+            print('invalid model input, using default: tfidf')
+            tokens,data_id,data_labels,all_sentences = read_all_file(data_path,stoplist,stemmer)                 
+            all_sent2,data_label2,tokens2 = read3000tweet()
+            X_train, X_test, y_train, y_test = train_test_split(all_sentences, data_labels,  test_size=0.30 , random_state = 0)                
+            c = list(zip(all_sent2,data_label2))
+            random.shuffle(c)
+            a, b = zip(*c)
+            X_train+=list(a)
+            y_train+=list(b)
+            train_tfidf_model_dataset2(model, X_train,X_test,y_train,y_test)
 
-train_word2vec_model(model,all_sentences,data_labels)
+#%%
+main()
+    
