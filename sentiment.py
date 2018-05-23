@@ -100,7 +100,6 @@ def read_file_vW(file_path,tokens,data_id,data_labels,label,stoplist,stemmer,pos
             
             count = len(all_sentences)
             for each_sentence in tokenized_sents:
-                #temp+=[''.join(c for c in s if c not in string.punctuation and not c.isnumeric() ) for s in each_sentence if s not in stoplist]
                 temp+=[''.join(c for c in s if c not in string.punctuation and  c.isalpha() ) for s in each_sentence if s not in stoplist]             
                 original_temp = list(filter(None, temp))
                 temp = [convert_turkish_char(stemmer.stem(s)) for s in temp ]
@@ -153,7 +152,6 @@ def read_file(file_path,tokens,data_id,data_labels,label,stoplist,stemmer, all_s
             temp=[]
             
             for each_sentence in tokenized_sents:
-                #temp+=[''.join(c for c in s if c not in string.punctuation and not c.isnumeric() ) for s in each_sentence if s not in stoplist]
                 temp+=[''.join(c for c in s if c not in string.punctuation and  c.isalpha() ) for s in each_sentence if s not in stoplist]             
                 temp = [convert_turkish_char(stemmer.stem(s)) for s in temp ]
                 temp = [s for s in temp if len(s)>1 and s not in stoplist]
@@ -219,7 +217,6 @@ def read3000tweet():
                     temp=[]
                     
                     for each_sentence in tokenized_sents:
-                        #temp+=[''.join(c for c in s if c not in string.punctuation and not c.isnumeric() ) for s in each_sentence if s not in stoplist]
                         temp+=[''.join(c for c in s if c not in string.punctuation and  c.isalpha() ) for s in each_sentence if s not in stoplist]             
                         temp = [convert_turkish_char(stemmer.stem(s)) for s in temp ]
                         temp = [s for s in temp if len(s)>1 and s not in stoplist]
@@ -514,8 +511,8 @@ def dump_best_model():
     dumping('model.plk',model_list)    
     
 #%%    
-test_path = input("write the test file path!")        
-#main()
+main()
+test_path = input("write the test file path!\n")        
 #get_prediction_from_best_model(test_path)    
 #dump_best_model()        
 model_list = read_dumping_file('model.plk')
